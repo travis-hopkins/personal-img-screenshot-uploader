@@ -1,0 +1,6 @@
+config.env
+app.log
+uploads/
+metadata.json
+instance/
+__pycache__

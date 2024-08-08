@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Screenshots</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>My Screenshots</h1>
+        {% if current_user.is_authenticated %}
+            <div class="auth-buttons">
+                <a href="{{ url_for('upload_file') }}" class="button">Upload New Screenshot</a>
+                <a href="{{ url_for('logout') }}" class="button">Logout</a>
+                <button class="button delete-account" onclick="deleteAccount()">Delete Account</button>
+            </div>
+        {% endif %}
+        <p>You have <span id="screenshotCount">{{ screenshots|length }}</span> active screenshot(s).</p>
+        {% if screenshots %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Filename</th>
+                        <th>Uploaded At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for screenshot in screenshots %}
+                    <tr data-screenshot-id="{{ screenshot.filename }}">
+                        <td>{{ screenshot.filename }}</td>
+                        <td>{{ screenshot.created_at|datetime }}</td>
+                        <td>
+                            <button class="button" onclick="copyUrl('{{ url_for('view_file', filename=screenshot.filename, _external=True) }}')">Copy URL</button>
+                            <a href="{{ url_for('view_file', filename=screenshot.filename) }}" target="_blank" class="button">Open URL</a>
+                            <button class="button delete" onclick="deleteScreenshot('{{ screenshot.filename }}')">Delete</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>You don't have any active screenshots.</p>
+        {% endif %}
+    </div>
+
+    <script>
+        function copyUrl(url) {
+            navigator.clipboard.writeText(url).then(() => {
+                alert('URL copied to clipboard');
+            });
+        }
+
+        function deleteScreenshot(filename) {
+            if (confirm('Are you sure you want to delete this screenshot?')) {
+                fetch('/delete_screenshot', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ filename: filename }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Remove the row from the table
+                        const row = document.querySelector(`tr[data-screenshot-id="${filename}"]`);
+                        if (row) {
+                            row.remove();
+                        }
+                        // Update the screenshot count
+                        updateScreenshotCount();
+                        // Check if there are any screenshots left
+                        const tbody = document.querySelector('tbody');
+                        if (tbody.children.length === 0) {
+                            // If no screenshots left, show a message
+                            const container = document.querySelector('.container');
+                            const table = document.querySelector('table');
+                            if (table) {
+                                table.remove();
+                            }
+                            const message = document.createElement('p');
+                            message.textContent = "You don't have any active screenshots.";
+                            container.appendChild(message);
+                        }
+                    } else {
+                        console.error('Failed to delete screenshot:', data.error);
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+            }
+        }
+
+        function updateScreenshotCount() {
+            const screenshotCount = document.querySelector('tbody').children.length;
+            const countElement = document.getElementById('screenshotCount');
+            if (countElement) {
+                countElement.textContent = screenshotCount;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateScreenshotCount();
+        });
+
+        function deleteAccount() {
+            if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+                fetch('/delete_account', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Account deleted successfully.');
+                        window.location.href = '{{ url_for("index") }}';
+                    } else {
+                        alert('Failed to delete account: ' + data.error);
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                    alert('Error deleting account.');
+                });
+            }
+        }
+    </script>
+</body>
+</html>

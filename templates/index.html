@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Screenshot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Upload Screenshot</h1>
+
+        {% if current_user.is_authenticated %}
+            <div id="uploadSection">
+                <div id="pasteArea">
+                    Paste your screenshot here or&nbsp; 
+                    <input type="file" id="fileInput" accept="image/*">
+                </div>
+                <img id="previewImage" alt="Pasted screenshot" style="display: none;">
+
+                <div class="button-container" id="buttons" style="display: none;">
+                    <button id="deleteButton" class="button">Delete</button>
+                    <button id="newButton" class="button">New</button>
+                    <button id="copyUrlButton" class="button">Copy URL</button>
+                    <button id="openUrlButton" class="button">Open URL</button>
+                </div>
+
+                <div class="option-container" id="options">
+                    <div class="option">
+                        <input type="checkbox" id="deleteOnView">
+                        <label for="deleteOnView" class="inline-label">Delete after first view</label>
+                    </div>
+                    <div class="option">
+                        <label for="deleteAfter" class="inline-label">Delete after:</label>
+                        <select id="deleteAfter" class="inline-input">
+                            <option value="5">5 minutes</option>
+                            <option value="10">10 minutes</option>
+                            <option value="30">30 minutes</option>
+                            <option value="60">1 hour</option>
+                            <option value="300">5 hours</option>
+                            <option value="1440">1 day</option>
+                            <option value="10080">1 week</option>
+                        </select>
+                    </div>
+                </div>
+                <p id="result"></p>
+            </div>
+
+            <div class="button-container">
+                <a href="{{ url_for('my_screenshots') }}" class="button">My Screenshots</a>
+                <a href="{{ url_for('logout') }}" class="button">Logout</a>
+            
+                {% if current_user.is_admin %}
+                    <a href="{{ url_for('users') }}" class="button">Users</a>
+                {% endif %}
+            </div>  
+            
+        {% else %}
+            <div class="auth-buttons">
+                <a href="{{ url_for('login') }}" class="button">Login</a>
+                <a href="{{ url_for('register') }}" class="button">Register</a>
+                <a href="{{ url_for('login_google') }}" class="button">Login with Google</a>
+            </div>
+            <p>Please log in or register to upload and manage your screenshots.</p>
+        {% endif %}
+    </div>
+
+    <script>
+document.addEventListener('DOMContentLoaded', () => {
+    const uploadSection = document.getElementById('uploadSection');
+    const previewImage = document.getElementById('previewImage');
+    const pasteArea = document.getElementById('pasteArea');
+    const fileInput = document.getElementById('fileInput');
+    const newButton = document.getElementById('newButton');
+    const deleteButton = document.getElementById('deleteButton');
+    const copyUrlButton = document.getElementById('copyUrlButton');
+    const openUrlButton = document.getElementById('openUrlButton');
+    const resultArea = document.getElementById('result');
+    const buttonContainer = document.getElementById('buttons');
+    const optionContainer = document.getElementById('options');
+    let currentUrl = null;
+    let currentFilename = null;
+
+    function handleFile(file) {
+        console.log('Handling file:', file); // Debug log
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            if (previewImage) {
+                previewImage.src = event.target.result;
+                previewImage.style.display = 'block';
+            }
+            if (pasteArea) {
+                pasteArea.style.display = 'none';
+                
+                // Initially hide buttons
+                if (buttonContainer) {
+                    buttonContainer.style.display = 'none';
+                }
+                
+                if (optionContainer) {
+                    optionContainer.style.display = 'flex';
+                }
+            }
+        };
+        reader.readAsDataURL(file);
+        uploadFile(file);
+    }
+
+    function handleFileInput(e) {
+        const file = e.target.files[0];
+        if (file) {
+            handleFile(file);
+        }
+    }
+
+    function handleNew() {
+        currentFilename = null;
+        currentUrl = null;
+        if (previewImage) {
+            previewImage.style.display = 'none';
+        }
+        if (pasteArea) {
+            pasteArea.style.display = 'flex';
+        }
+        if (buttonContainer) {
+            buttonContainer.style.display = 'none';
+        }
+        if (newButton) {
+            newButton.style.display = 'none'; // Hide New button initially
+        }
+        if (resultArea) {
+            resultArea.textContent = '';
+        }
+        if (optionContainer) {
+            optionContainer.style.display = 'flex'; // Show the delete options when resetting
+        }
+    }
+
+    function handleDelete() {
+        console.log('Deleting file:', currentFilename); // Debug log
+        if (currentFilename) {
+            fetch(`/delete_screenshot/${currentFilename}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ filename: currentFilename }), // Check if this is necessary
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (resultArea) {
+                        resultArea.textContent = 'Screenshot deleted successfully.';
+                    }
+                    handleNew(); // Reset the UI
+                } else {
+                    if (resultArea) {
+                        resultArea.textContent = 'Failed to delete screenshot: ' + data.error;
+                    }
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                if (resultArea) {
+                    resultArea.textContent = 'Error deleting screenshot.';
+                }
+            });
+        } else {
+            if (resultArea) {
+                resultArea.textContent = 'No screenshot to delete.';
+            }
+        }
+    }
+
+    function handleCopyUrl() {
+        if (currentUrl) {
+            navigator.clipboard.writeText(currentUrl).then(() => {
+                if (resultArea) {
+                    resultArea.textContent = 'URL copied to clipboard!';
+                }
+            }).catch(err => {
+                console.error('Failed to copy URL: ', err);
+                if (resultArea) {
+                    resultArea.textContent = 'Failed to copy URL.';
+                }
+            });
+        }
+    }
+
+    function handleOpenUrl() {
+        if (currentUrl) {
+            window.open(currentUrl, '_blank');
+        }
+    }
+
+    function uploadFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('deleteOnView', document.getElementById('deleteOnView').checked);
+        formData.append('deleteAfter', document.getElementById('deleteAfter').value);
+
+        fetch('/upload', {
+            method: 'POST',
+            body: formData,
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Upload response:', data); // Debug log
+            if (data.filename && data.url) {
+                currentUrl = data.url;
+                currentFilename = data.filename;
+                if (resultArea) {
+                    resultArea.textContent = `File uploaded successfully. URL: ${currentUrl}`;
+                }
+                if (newButton) {
+                    newButton.style.display = 'inline-block'; // Show New button after upload
+                }
+                if (previewImage) {
+                    previewImage.src = currentUrl; // Update preview image source
+                    previewImage.style.display = 'block'; // Show preview image
+                }
+                if (pasteArea) {
+                    pasteArea.style.display = 'none'; // Hide paste area
+                }
+                if (buttonContainer) {
+                    buttonContainer.style.display = 'inline-block'; // Show buttons
+                }
+                const optionContainer = document.querySelector('.option-container');
+                if (optionContainer) {
+                    optionContainer.style.display = 'none';
+                }
+            } else {
+                if (resultArea) {
+                    resultArea.textContent = 'Failed to get filename or URL from server.';
+                }
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            if (resultArea) {
+                resultArea.textContent = 'Error uploading file.';
+            }
+        });
+    }
+
+    function handlePaste(e) {
+        console.log('Handling paste event'); // Debug log
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        for (const item of items) {
+            if (item.type.startsWith('image/')) {
+                const file = item.getAsFile();
+                if (file) {
+                    handleFile(file);
+                }
+            }
+        }
+    }
+
+    document.addEventListener('paste', handlePaste);
+
+    if (newButton) {
+        newButton.addEventListener('click', handleNew);
+    }
+    if (deleteButton) {
+        deleteButton.addEventListener('click', handleDelete);
+    }
+    if (copyUrlButton) {
+        copyUrlButton.addEventListener('click', handleCopyUrl);
+    }
+    if (openUrlButton) {
+        openUrlButton.addEventListener('click', handleOpenUrl);
+    }
+    if (fileInput) {
+        fileInput.addEventListener('change', handleFileInput);
+    }
+});
+
+    </script>
+</body>
+</html>
