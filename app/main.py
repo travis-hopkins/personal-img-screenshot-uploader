@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from flask_bcrypt import Bcrypt
 
 # Load environment variables from .env file
-load_dotenv('config.env')
+load_dotenv('/opt/screenshot-app/app/config.env')
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='/opt/screenshot-app/static', template_folder='/opt/screenshot-app/templates')
@@ -38,12 +38,18 @@ app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
 
 # OAuth configuration
-client_id = os.getenv('GOOGLE_CLIENT_ID')
-client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
-authorization_base_url = 'https://accounts.google.com/o/oauth2/auth'
-token_url = 'https://accounts.google.com/o/oauth2/token'
-redirect_uri = os.getenv('GOOGLE_REDIRECT_URI')
-scope = ['profile', 'email']
+client_id = os.getenv('OAUTH_CLIENT_ID')
+client_secret = os.getenv('OAUTH_CLIENT_SECRET')
+authorization_base_url = os.getenv('OAUTH_AUTHORIZATION_BASE_URL')
+token_url = os.getenv('OAUTH_TOKEN_URL')
+redirect_uri = os.getenv('OAUTH_REDIRECT_URI')
+
+# Handle OAuth scope
+oauth_scope = os.getenv('OAUTH_SCOPE')
+if oauth_scope is None:
+    app.logger.error('OAUTH_SCOPE environment variable is not set.')
+    raise ValueError('OAUTH_SCOPE environment variable is not set.')
+scope = oauth_scope.split(',')
 
 UPLOAD_FOLDER = app.config['UPLOAD_FOLDER']
 if not os.path.exists(UPLOAD_FOLDER):
@@ -267,7 +273,8 @@ def upload_file():
             # Get deleteAfter value and validate it
             delete_after_minutes = request.form.get('deleteAfter', type=int)
             allowed_values = {5, 10, 30, 60, 300, 1440, 10080}  # Allowed values in minutes
-            if delete_after_minutes not in allowed_values:
+
+            if delete_after_minutes != 0 and delete_after_minutes not in allowed_values:
                 app.logger.warning(f"Invalid delete after value: {delete_after_minutes}")
                 return jsonify({'error': 'Invalid delete after value.'}), 400
 
@@ -285,10 +292,10 @@ def upload_file():
             db.session.add(screenshot)
             db.session.commit()
 
-            if delete_after_minutes:
+            if delete_after_minutes > 0:
                 app.logger.info(f"Setting up timed deletion for {filename} after {delete_after_minutes} minutes")
                 threading.Timer(delete_after_minutes * 60, delete_file, args=(file_path,)).start()
-            
+
             file_url = f"https://scr.travis-hopkins.com/screenshot/{filename}"
             app.logger.info(f"Generated file URL: {file_url}")
 
@@ -300,6 +307,7 @@ def upload_file():
     except Exception as e:
         app.logger.error(f"Error during file upload: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
 
 
 @app.route('/delete_screenshot/<filename>', methods=['POST'])

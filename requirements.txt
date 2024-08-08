@@ -1,7 +1,7 @@
 Flask==3.0.3
-Flask_Bcrypt==1.0.1
-Flask_Login==0.6.3
-Flask_Mail==0.9.1
+flask_bcrypt==1.0.1
+flask_login==0.6.3
+flask_mail==0.10.0
 flask_sqlalchemy==3.1.1
 itsdangerous==2.2.0
 python-dotenv==1.0.1
