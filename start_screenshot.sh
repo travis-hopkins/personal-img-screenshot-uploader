@@ -1,16 +1,24 @@
 #!/bin/bash
 
 # Define the port and app directory
-PORT=5000
-APP_DIR="/opt/screenshot-app"
+PORT=5003
+APP_DIR="/opt/screenshot-app/app"
 GUNICORN_BIN="/home/ubuntu/miniforge3/envs/screenshot-app/bin/gunicorn"
-APP_MODULE="screenshot:app"
+APP_MODULE="main:app"
 
 # Function to check if the process is running
 is_running() {
     lsof -i :$PORT | grep LISTEN > /dev/null
     return $?
 }
+
+# Load environment variables from the config.env file
+if [ -f "$APP_DIR/config.env" ]; then
+    export $(grep -v '^#' "$APP_DIR/config.env" | xargs)
+else
+    echo "config.env file not found in $APP_DIR"
+    exit 1
+fi
 
 # Navigate to the application directory
 cd $APP_DIR
