@@ -4,16 +4,15 @@ import uuid
 import time
 import logging
 from datetime import datetime
-from flask import Flask, request, jsonify, send_file, redirect, url_for, flash, render_template, session, send_from_directory
+from flask import Flask, request, jsonify, send_file, redirect, url_for, flash, render_template, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_mail import Mail, Message
 from requests_oauthlib import OAuth2Session
 from itsdangerous import URLSafeTimedSerializer
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash
 from dotenv import load_dotenv
-from flask_bcrypt import Bcrypt
 
 # Load environment variables from .env file
 load_dotenv('/opt/screenshot-app/app/config.env')
@@ -24,8 +23,13 @@ app = Flask(__name__, static_folder='/opt/screenshot-app/static', template_folde
 # Secret key for sessions
 app.secret_key = os.getenv('SECRET_KEY')
 
+# Ensure instance directory exists
+instance_folder = '/opt/screenshot-app/instance'
+if not os.path.exists(instance_folder):
+    os.makedirs(instance_folder)
+
 # Database configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI')
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(instance_folder, "screenshot_app.db")}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = os.getenv('SQLALCHEMY_TRACK_MODIFICATIONS') == 'True'
 app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER')
 
@@ -110,6 +114,10 @@ def datetimeformat(value, format='%Y-%m-%d %H:%M:%S'):
     if isinstance(value, float):
         value = datetime.fromtimestamp(value)
     return value.strftime(format)
+
+# Create database tables if they do not exist
+with app.app_context():
+    db.create_all()
 
 # Routes
 @app.route('/')
@@ -465,5 +473,7 @@ def blocked():
 
 
 
+
+# Run the app
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0', port=5000)
