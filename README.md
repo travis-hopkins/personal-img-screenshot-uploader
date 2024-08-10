@@ -36,5 +36,5 @@ The **Personal Image Screenshot Uploader** is a web application designed to uplo
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/yourusername/personal-image-screenshot-uploader.git
+   git clone https://github.com/travis-hopkins/personal-image-screenshot-uploader.git
    cd personal-image-screenshot-uploader
